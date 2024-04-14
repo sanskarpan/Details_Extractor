@@ -1,24 +1,26 @@
 import streamlit as st
 import pandas as pd
 import docx2txt
-from PyPDF2 import PdfReader
+import fitz  # PyMuPDF
 import re
 from io import BytesIO
+import base64
+import tempfile
 
 def extract_info(doc_file):
     if doc_file.name.endswith('.docx'):
         text = docx2txt.process(doc_file)
     elif doc_file.name.endswith('.pdf'):
-        reader = PdfReader(doc_file)
         text = ''
-        for page in reader.pages:
-            text += page.extract_text()
+        with fitz.open(stream=doc_file.read(), filetype="pdf") as pdf:
+            for page in pdf:
+                text += page.get_text()
     else:
         st.error("Unsupported file format. Please upload a DOCX or PDF file.")
         return None
     
     email = re.findall(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', text)
-    phone = re.findall(r'[\+\(]?[1-9][0-9 .\-\(\)]{8,}[0-9]', text)
+    phone = re.findall(r'\b(?:\+?\d{1,3}[-.\s]?)?\(?(?:\d{2,3})\)?[-.\s]?\d{3,4}[-.\s]?\d{4}\b', text)
     phone = phone if phone else ['-']  # If phone list is empty, replace with single dash "-"
     return {
         'Email': email,
@@ -29,20 +31,30 @@ def extract_info(doc_file):
 def main():
     st.title("CV Information Extractor")
 
-    uploaded_file = st.file_uploader("Upload CV", type=['docx', 'pdf'])
-    if uploaded_file is not None:
-        info = extract_info(uploaded_file)
-        if info is not None:
+    uploaded_files = st.file_uploader("Upload CVs", type=['docx', 'pdf'], accept_multiple_files=True)
+    if uploaded_files:
+        all_info = []
+        for uploaded_file in uploaded_files:
+            info = extract_info(uploaded_file)
+            if info is not None:
+                all_info.append(info)
+        
+        if all_info:
             st.write("Extracted Information:")
-            st.write(pd.DataFrame.from_dict([info]))
+            df = pd.DataFrame.from_records(all_info)
+            st.write(df)
 
             if st.button('Export to Excel'):
-                df = pd.DataFrame.from_dict([info])
-                excel_file = df.to_excel(index=False)
-                excel_bytes = excel_file.getvalue()
-                b64 = base64.b64encode(excel_bytes).decode()
-                href = f'<a href="data:file/xlsx;base64,{b64}" download="cv_info.xlsx">Download Excel File</a>'
-                st.markdown(href, unsafe_allow_html=True)
+                with tempfile.NamedTemporaryFile(delete=False) as temp:
+                    temp_name = temp.name + ".xlsx"
+                    with pd.ExcelWriter(temp_name, engine='xlsxwriter') as writer:
+                        df.to_excel(writer, index=False, sheet_name='CV_Info')
+                
+                with open(temp_name, 'rb') as f:
+                    data = f.read()
+                    b64 = base64.b64encode(data).decode()
+                    href = f'<a href="data:application/octet-stream;base64,{b64}" download="cv_info.xlsx">Download Excel File</a>'
+                    st.markdown(href, unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
