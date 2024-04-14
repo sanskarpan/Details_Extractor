@@ -2,3 +2,4 @@ pandas
 docx2txt
 PyMuPDF
 regex
+xlsxwriter
