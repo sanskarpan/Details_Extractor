@@ -3,6 +3,7 @@ import pandas as pd
 import docx2txt
 from PyPDF2 import PdfReader
 import re
+from io import BytesIO
 
 def extract_info(doc_file):
     if doc_file.name.endswith('.docx'):
@@ -37,8 +38,11 @@ def main():
 
             if st.button('Export to Excel'):
                 df = pd.DataFrame.from_dict([info])
-                df.to_excel("cv_info.xlsx", index=False)
-                st.success("Data exported successfully to cv_info.xlsx")
+                excel_file = df.to_excel(index=False)
+                excel_bytes = excel_file.getvalue()
+                b64 = base64.b64encode(excel_bytes).decode()
+                href = f'<a href="data:file/xlsx;base64,{b64}" download="cv_info.xlsx">Download Excel File</a>'
+                st.markdown(href, unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
