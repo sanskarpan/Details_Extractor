@@ -30,6 +30,8 @@ def extract_info(doc_file):
 
 def main():
     st.title("CV Information Extractor")
+    st.markdown("---")
+    st.write("This app allows you to upload CVs in DOCX and PDF format, extract information from them, and export the extracted data into an Excel file.")
 
     uploaded_files = st.file_uploader("Upload CVs", type=['docx', 'pdf'], accept_multiple_files=True)
     if uploaded_files:
